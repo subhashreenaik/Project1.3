@@ -1,0 +1,34 @@
+1.  REGISTER '/home/acadgild/Desktop/elephant-bird-hadoop-compat-4.1.jar';
+ 
+    REGISTER '/home/acadgild/Desktop/elephant-bird-pig-4.1.jar';
+ 
+    REGISTER '/home/acadgild/Desktop/json-simple-1.1.1.jar';
+    
+2. To load the json file
+   load_tweets = LOAD '/user/flume/tweets/' USING com.twitter.elephantbird.pig.load.JsonLoader('-nestedLoad') AS myMap;
+   
+3. extract the id and the tweet text from the above tweets
+   extract_details = FOREACH load_tweets GENERATE myMap#'id' as id,myMap#'text' as text;
+   
+4. extract the words from the text using the TOKENIZE key word in Pig.
+   tokens = foreach extract_details generate id,text, FLATTEN(TOKENIZE(text)) As word;
+   
+5. load the dictionary into pig
+   dictionary = load '/AFINN.txt' using PigStorage('\t') AS(word:chararray,rating:int);
+   
+6.  join by joining the tokens statement and the dictionary contents
+     word_rating = join tokens by word left outer, dictionary by word using 'replicated';
+     
+7.   extract the id,tweet text and word rating(from the dictionary)
+     rating = foreach word_rating generate tokens::id as id,tokens::text as text, dictionary::rating as rate;
+     
+8.   group the rating of all the words in a tweet
+     word_group = group rating by (id,text);
+     
+9.     perform the Average operation on the rating of the words per each tweet.
+       avg_rate = foreach word_group generate group, AVG(rating.rate) as tweet_rating;
+       
+10.   Now we will filter the positive tweets using the below statement
+      positive_tweets = filter avg_rate by tweet_rating>=0;
+      
+
